@@ -19,7 +19,7 @@ class VpnCheck:
         return self._proxy_ok
 
     async def check_once(self) -> bool:
-        proxy = self.config["binance"]["proxy"]
+        proxy = self.config["binance"].get("proxy")
         testnet = self.config["binance"]["testnet"]
         base = "https://testnet.binancefuture.com" if testnet else "https://fapi.binance.com"
         url = f"{base}/fapi/v1/time"

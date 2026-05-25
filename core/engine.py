@@ -186,6 +186,34 @@ class Engine:
         except Exception as e:
             logger.error(f"Save state: {e}")
 
+    async def _log_account_status(self):
+        try:
+            bal = await self.balance_monitor.check()
+            if bal:
+                logger.info(
+                    f"Account | Futures: {bal['futures_balance']} USDT "
+                    f"| Spot: {bal['spot_balance']} USDT "
+                    f"| Total: {bal['total']} USDT"
+                )
+        except Exception as e:
+            logger.warning(f"Account balance query failed: {e}")
+
+        try:
+            positions = await self.client.futures_position_information()
+            open_positions = [
+                p for p in positions if float(p.get("positionAmt", 0)) != 0
+            ]
+            if open_positions:
+                for p in open_positions:
+                    logger.info(
+                        f"Position | {p['symbol']}: qty={p['positionAmt']} "
+                        f"entry={p['entryPrice']} uPnL={p['unRealizedProfit']}"
+                    )
+            else:
+                logger.info("Position | No open positions")
+        except Exception as e:
+            logger.warning(f"Position query failed: {e}")
+
     async def _scan_loop(self):
         interval = self.config["strategy"]["kline_interval"]
         # Map interval string to seconds for scan pacing
@@ -196,6 +224,7 @@ class Engine:
 
         while True:
             try:
+                await self._log_account_status()
                 if not self._current_position and self.vpn_check.proxy_ok and self.guard.can_trade():
                     await self._scan_all_symbols()
                 await asyncio.sleep(scan_interval)
@@ -234,6 +263,7 @@ class Engine:
                         f"Scan signal: {symbol} ATR%={signal.atr_pct:.2f} "
                         f"pullback={signal.pullback_pct:.2f}% RSI={signal.rsi:.1f}"
                     )
+                    await self._persist_signal(signal)
                     result = await self.executor.execute_open(signal, self.db)
                     if result:
                         self._current_position = result
@@ -269,6 +299,7 @@ class Engine:
             f"Signal detected: {symbol} ATR%={signal.atr_pct:.2f} "
             f"pullback={signal.pullback_pct:.2f}% RSI={signal.rsi:.1f}"
         )
+        await self._persist_signal(signal)
 
         result = await self.executor.execute_open(signal, self.db)
         if result:
@@ -283,6 +314,18 @@ class Engine:
                 sl=result["sl_price"],
                 tp=result["tp_price"],
             )
+
+    async def _persist_signal(self, signal):
+        try:
+            await self.db.insert_signal(
+                symbol=signal.symbol, direction=signal.direction,
+                atr_pct=signal.atr_pct, pullback_pct=signal.pullback_pct,
+                rsi=signal.rsi, volume=signal.volume,
+                volume_ma=signal.volume_ma, ema=signal.ema,
+                close=signal.close, params=signal.params,
+            )
+        except Exception as e:
+            logger.warning(f"Persist signal failed: {e}")
 
     async def _on_position_closed(self, symbol: str, exit_price: float,
                                   is_sl: bool, order_id: int):

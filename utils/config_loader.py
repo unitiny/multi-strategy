@@ -23,6 +23,16 @@ def load_config(config_path: str = None) -> dict:
         "secret": os.getenv("DINGTALK_SECRET", ""),
     }
 
+    proxy_http = os.getenv("PROXY_HTTP")
+    proxy_https = os.getenv("PROXY_HTTPS")
+    if proxy_http or proxy_https:
+        config["binance"]["proxy"] = {
+            "http": proxy_http or "",
+            "https": proxy_https or "",
+        }
+    else:
+        config["binance"].pop("proxy", None)
+
     return config
 
 

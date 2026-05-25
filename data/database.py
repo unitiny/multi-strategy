@@ -42,6 +42,21 @@ class Database:
                 amount REAL NOT NULL,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             );
+
+            CREATE TABLE IF NOT EXISTS signals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                symbol TEXT NOT NULL,
+                direction TEXT NOT NULL,
+                atr_pct REAL,
+                pullback_pct REAL,
+                rsi REAL,
+                volume REAL,
+                volume_ma REAL,
+                ema REAL,
+                close REAL,
+                params TEXT,
+                triggered_at TEXT NOT NULL
+            );
         """)
         await self._conn.commit()
 
@@ -136,5 +151,63 @@ class Database:
         async with self._conn.execute(
             "SELECT * FROM trades WHERE status='closed' ORDER BY exit_time DESC"
         ) as cursor:
+            rows = await cursor.fetchall()
+            return [dict(r) for r in rows]
+
+    async def insert_signal(self, symbol: str, direction: str, atr_pct: float,
+                            pullback_pct: float, rsi: float, volume: float,
+                            volume_ma: float, ema: float, close: float,
+                            params: dict = None):
+        await self._conn.execute(
+            """INSERT INTO signals (symbol, direction, atr_pct, pullback_pct, rsi,
+               volume, volume_ma, ema, close, params, triggered_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (symbol, direction, atr_pct, pullback_pct, rsi,
+             volume, volume_ma, ema, close,
+             json.dumps(params) if params else None,
+             datetime.utcnow().isoformat())
+        )
+        await self._conn.commit()
+
+    async def query_signals(self, start_date: str = None, end_date: str = None,
+                            symbol: str = None, limit: int = 100):
+        conditions = []
+        params = []
+        if start_date:
+            conditions.append("DATE(triggered_at) >= ?")
+            params.append(start_date)
+        if end_date:
+            conditions.append("DATE(triggered_at) <= ?")
+            params.append(end_date)
+        if symbol:
+            conditions.append("symbol = ?")
+            params.append(symbol)
+        where = " AND ".join(conditions) if conditions else "1=1"
+        params.append(limit)
+        query = f"SELECT * FROM signals WHERE {where} ORDER BY triggered_at DESC LIMIT ?"
+        async with self._conn.execute(query, params) as cursor:
+            rows = await cursor.fetchall()
+            return [dict(r) for r in rows]
+
+    async def query_trades(self, start_date: str = None, end_date: str = None,
+                           status: str = None, symbol: str = None, limit: int = 100):
+        conditions = []
+        params = []
+        if start_date:
+            conditions.append("DATE(entry_time) >= ?")
+            params.append(start_date)
+        if end_date:
+            conditions.append("DATE(entry_time) <= ?")
+            params.append(end_date)
+        if status:
+            conditions.append("status = ?")
+            params.append(status)
+        if symbol:
+            conditions.append("symbol = ?")
+            params.append(symbol)
+        where = " AND ".join(conditions) if conditions else "1=1"
+        params.append(limit)
+        query = f"SELECT * FROM trades WHERE {where} ORDER BY entry_time DESC LIMIT ?"
+        async with self._conn.execute(query, params) as cursor:
             rows = await cursor.fetchall()
             return [dict(r) for r in rows]

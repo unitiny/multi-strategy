@@ -2,9 +2,7 @@ mode: scan  # watchlist | scan
 
 binance:
   testnet: true  # true=模拟盘, false=实盘
-  proxy:
-    http: "http://127.0.0.1:7897"
-    https: "http://127.0.0.1:7897"
+  # proxy 通过 .env 的 PROXY_HTTP / PROXY_HTTPS 配置，留空则不使用代理
 
 strategy:
   fixed_loss: 0.21          # USDT，单笔固定亏损
@@ -45,3 +43,6 @@ schedule:
   vpn_check_interval_sec: 300
 
 log_level: INFO  # DEBUG | INFO | WARNING | ERROR
+
+api:
+  port: 9450  # API 服务端口

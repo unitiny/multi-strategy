@@ -4,6 +4,8 @@ import sys
 import logging
 from pathlib import Path
 
+import uvicorn
+
 from core.engine import Engine
 from utils.config_loader import load_config
 from utils.logger import setup_logger
@@ -37,8 +39,18 @@ async def main():
         except NotImplementedError:
             signal.signal(signal.SIGINT, lambda *_: _signal_handler())
 
+    server = None
     try:
         await engine.start()
+
+        # Start FastAPI as background task
+        from api.app import create_app
+        api_port = config.get("api", {}).get("port", 8000)
+        app = create_app(client=engine.client, db=engine.db, port=api_port)
+        config_log = uvicorn.Config(app, host="0.0.0.0", port=api_port, log_level="warning")
+        server = uvicorn.Server(config_log)
+        api_task = asyncio.create_task(server.serve())
+
         logger.info("System running. Press Ctrl+C to stop.")
         await stop_event.wait()
     except KeyboardInterrupt:
@@ -48,6 +60,8 @@ async def main():
         if engine.notifier:
             await engine.notifier.notify_error(f"Fatal: {e}")
     finally:
+        if server:
+            server.should_exit = True
         await engine.stop()
         logger.info("System shutdown complete")
 
