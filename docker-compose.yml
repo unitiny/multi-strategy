@@ -1,8 +1,6 @@
 services:
   multi-strategy:
-    build:
-      context: .
-    image: ghcr.io/unitiny/multi-strategy:latest
+    image: ghcr.io/unitiny/multi-strategy:${IMAGE_TAG:-latest}
     container_name: multi-strategy
     restart: always
     network_mode: host
