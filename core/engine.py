@@ -42,6 +42,8 @@ class Engine:
         self.heartbeat: Optional[Heartbeat] = None
         self._current_position: Optional[dict] = None
         self._scheduler_task: Optional[asyncio.Task] = None
+        self._scan_task: Optional[asyncio.Task] = None
+        self._scan_symbols: list[str] = []
         self._running = False
 
     async def start(self):
@@ -62,14 +64,23 @@ class Engine:
             https_proxy=proxy_url,
         )
 
-        symbols = [w["symbol"] for w in self.config.get("watchlist", [])]
+        mode = self.config.get("mode", "watchlist")
 
-        self.feed = MarketFeed(
-            self.client, self.cache, symbols,
-            interval=self.config["strategy"]["kline_interval"],
-            proxy_url=proxy_url,
-        )
-        self.feed.set_on_kline_close(self._on_kline_close)
+        if mode == "scan":
+            # feed is still needed for fetch_exchange_info()
+            self.feed = MarketFeed(
+                self.client, self.cache, [],
+                interval=self.config["strategy"]["kline_interval"],
+                proxy_url=proxy_url,
+            )
+        else:
+            symbols = [w["symbol"] for w in self.config.get("watchlist", [])]
+            self.feed = MarketFeed(
+                self.client, self.cache, symbols,
+                interval=self.config["strategy"]["kline_interval"],
+                proxy_url=proxy_url,
+            )
+            self.feed.set_on_kline_close(self._on_kline_close)
 
         self.strategy = Strategy(self.config, self.cache)
         self.executor = Executor(self.client, self.config)
@@ -102,7 +113,10 @@ class Engine:
 
         await self.vpn_check.start()
         await self.oco.start()
-        await self.feed.start()
+        if mode == "scan":
+            self._scan_task = asyncio.create_task(self._scan_loop())
+        else:
+            await self.feed.start()
 
         self._scheduler_task = asyncio.create_task(self._scheduler_loop())
 
@@ -121,6 +135,8 @@ class Engine:
 
         if self.feed:
             await self.feed.stop()
+        if self._scan_task:
+            self._scan_task.cancel()
         if self.oco:
             await self.oco.stop()
         if self.vpn_check:
@@ -155,6 +171,71 @@ class Engine:
                 json.dump(state, f, indent=2, ensure_ascii=False)
         except Exception as e:
             logger.error(f"Save state: {e}")
+
+    async def _scan_loop(self):
+        interval = self.config["strategy"]["kline_interval"]
+        # Map interval string to seconds for scan pacing
+        interval_sec = {"1m": 60, "5m": 300, "15m": 900, "1h": 3600,
+                        "4h": 14400, "1d": 86400}.get(interval, 3600)
+        # Scan more frequently than the kline interval to catch signals sooner
+        scan_interval = max(60, interval_sec // 4)
+
+        while True:
+            try:
+                if not self._current_position and self.vpn_check.proxy_ok and self.guard.can_trade():
+                    await self._scan_all_symbols()
+                await asyncio.sleep(scan_interval)
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Scan loop error: {e}")
+                if self.notifier:
+                    await self.notifier.notify_error(f"Scan: {e}")
+                await asyncio.sleep(60)
+
+    async def _scan_all_symbols(self):
+        try:
+            exchange_symbols = await self.feed.fetch_exchange_info()
+        except Exception as e:
+            logger.error(f"Fetch exchange info failed: {e}")
+            return
+
+        all_symbols = list(exchange_symbols.keys())
+        logger.info(f"Scanning {len(all_symbols)} symbols...")
+
+        for symbol in all_symbols:
+            try:
+                raw = await self.client.futures_klines(
+                    symbol=symbol,
+                    interval=self.config["strategy"]["kline_interval"],
+                    limit=30,
+                )
+                klines = [_parse_kline(k) for k in raw]
+                if len(klines) < 20:
+                    continue
+
+                signal = self.strategy.scan_evaluate(symbol, klines)
+                if signal:
+                    logger.info(
+                        f"Scan signal: {symbol} ATR%={signal.atr_pct:.2f} "
+                        f"pullback={signal.pullback_pct:.2f}% RSI={signal.rsi:.1f}"
+                    )
+                    result = await self.executor.execute_open(signal, self.db)
+                    if result:
+                        self._current_position = result
+                        self.oco.set_position(result)
+                        self._save_state()
+                        await self.notifier.notify_open(
+                            symbol=result["symbol"],
+                            direction="LONG",
+                            quantity=result["quantity"],
+                            entry_price=result["entry_price"],
+                            sl=result["sl_price"],
+                            tp=result["tp_price"],
+                        )
+                        break
+            except Exception as e:
+                logger.debug(f"Scan {symbol} failed: {e}")
 
     async def _on_kline_close(self, symbol: str, kline: dict):
         logger.info(f"Kline closed: {symbol}")
@@ -234,8 +315,8 @@ class Engine:
                 report_time = self.config["schedule"]["funding_report"]
                 if time_str == report_time and last_report_date != now.strftime("%Y-%m-%d"):
                     last_report_date = now.strftime("%Y-%m-%d")
-                    symbols = [w["symbol"] for w in self.config.get("watchlist", [])]
-                    for s in symbols:
+                    funding_symbols = self._scan_symbols or [w["symbol"] for w in self.config.get("watchlist", [])]
+                    for s in funding_symbols:
                         await self.funding_monitor.collect_funding(s)
                     report = await self.funding_monitor.generate_report()
                     await self.notifier.notify_funding_report(report)

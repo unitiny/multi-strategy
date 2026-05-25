@@ -1,4 +1,4 @@
-mode: watchlist  # watchlist | scan
+mode: scan  # watchlist | scan
 
 binance:
   testnet: true  # true=模拟盘, false=实盘

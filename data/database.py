@@ -77,6 +77,21 @@ class Database:
             row = await cursor.fetchone()
             return dict(row) if row else None
 
+    async def get_open_trade_by_symbol(self, symbol: str):
+        async with self._conn.execute(
+            "SELECT * FROM trades WHERE symbol=? AND status='open' LIMIT 1",
+            (symbol,),
+        ) as cursor:
+            row = await cursor.fetchone()
+            return dict(row) if row else None
+
+    async def get_all_open_trades(self):
+        async with self._conn.execute(
+            "SELECT * FROM trades WHERE status='open'"
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [dict(r) for r in rows]
+
     async def insert_funding_rate(self, symbol: str, funding_rate: float,
                                   funding_time: str, amount: float):
         await self._conn.execute(
