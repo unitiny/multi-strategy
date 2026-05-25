@@ -26,6 +26,9 @@ def test_deploy_workflow_pulls_prebuilt_sha_image():
         encoding="utf-8"
     )
 
+    assert "script_stop: true" in workflow
+    assert "docker login ghcr.io" in workflow
+    assert "docker manifest inspect ghcr.io/unitiny/multi-strategy:${{ github.sha }}" in workflow
     assert "IMAGE_TAG=${{ github.sha }} docker compose pull" in workflow
     assert "IMAGE_TAG=${{ github.sha }} docker compose run --rm --no-deps multi-strategy" in workflow
     assert "test ! -e /app/data" in workflow
