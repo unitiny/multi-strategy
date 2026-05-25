@@ -52,6 +52,5 @@ jobs:
             git stash --include-untracked
             git pull origin master
             git stash drop 2>/dev/null || true
-            docker compose pull
-            docker compose up -d --remove-orphans
+            docker compose up -d --build --remove-orphans
             docker image prune -f

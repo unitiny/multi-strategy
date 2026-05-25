@@ -1,5 +1,7 @@
 services:
   multi-strategy:
+    build:
+      context: .
     image: ghcr.io/unitiny/multi-strategy:latest
     container_name: multi-strategy
     restart: always
