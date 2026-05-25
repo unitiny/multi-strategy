@@ -4,6 +4,7 @@ import os
 import tempfile
 
 from core.executor import Executor
+from core.oco_watcher import OcoWatcher
 from core.position_sync import PositionSync
 from data.database import Database
 
@@ -131,6 +132,8 @@ async def test_open_uses_exchange_quantity_and_entry_after_fill():
         result = await executor.execute_open(DummySignal(), db)
         assert result["quantity"] == 0.25
         assert result["entry_price"] == 101.5
+        assert result["sl_order_ids"]
+        assert result["tp_order_ids"]
         trade = await db.get_open_trade()
         assert trade["quantity"] == 0.25
         assert trade["entry_price"] == 101.5
@@ -160,6 +163,18 @@ async def test_reduce_only_market_close_splits_by_exchange_max_quantity():
     assert result["filled"] == 12.0
 
 
+async def test_protective_orders_split_by_exchange_max_quantity():
+    client = FakeClient()
+    executor = Executor(client, config())
+    await executor._place_sl("TESTUSDT", 12.0, 99.0)
+    await executor._place_tp("TESTUSDT", 12.0, 103.0)
+    stop_chunks = [o["quantity"] for o in client.created_orders if o["type"] == "STOP_MARKET"]
+    take_chunks = [o["quantity"] for o in client.created_orders if o["type"] == "TAKE_PROFIT_MARKET"]
+    assert stop_chunks == [5.0, 5.0, 2.0]
+    assert take_chunks == [5.0, 5.0, 2.0]
+    assert all(o.get("reduceOnly") for o in client.created_orders)
+
+
 async def test_cleanup_orphaned_protective_orders_skips_active_symbol():
     client = FakeClient()
     executor = Executor(client, config())
@@ -182,6 +197,32 @@ async def test_startup_sync_recovers_exchange_position_and_attaches_protection()
     await with_db(run)
 
 
+async def test_oco_poll_cancels_all_counterpart_split_orders():
+    client = FakeClient()
+    client.order_status = {
+        10: {"orderId": 10, "status": "FILLED", "avgPrice": "99"},
+        11: {"orderId": 11, "status": "NEW", "avgPrice": "0"},
+        20: {"orderId": 20, "status": "NEW", "avgPrice": "0"},
+        21: {"orderId": 21, "status": "NEW", "avgPrice": "0"},
+    }
+    fills = []
+
+    async def on_fill(**kwargs):
+        fills.append(kwargs)
+
+    watcher = OcoWatcher(client, on_fill)
+    watcher.set_position({
+        "symbol": "TESTUSDT",
+        "sl_order_id": 10,
+        "tp_order_id": 20,
+        "sl_order_ids": [10, 11],
+        "tp_order_ids": [20, 21],
+    })
+    await watcher._poll_check()
+    assert client.cancelled_orders == [("TESTUSDT", 20), ("TESTUSDT", 21)]
+    assert fills and fills[0]["is_sl"] is True
+
+
 async def main():
     tests = [
         test_rejects_duplicate_open_from_db,
@@ -189,8 +230,10 @@ async def main():
         test_open_uses_exchange_quantity_and_entry_after_fill,
         test_failed_stop_loss_triggers_reduce_only_emergency_close_without_db_open,
         test_reduce_only_market_close_splits_by_exchange_max_quantity,
+        test_protective_orders_split_by_exchange_max_quantity,
         test_cleanup_orphaned_protective_orders_skips_active_symbol,
         test_startup_sync_recovers_exchange_position_and_attaches_protection,
+        test_oco_poll_cancels_all_counterpart_split_orders,
     ]
     for test in tests:
         await test()

@@ -10,6 +10,7 @@ from binance.async_client import AsyncClient as BinanceAsyncClient
 from core.strategy import Strategy
 from core.executor import Executor
 from core.oco_watcher import OcoWatcher
+from core.position_sync import PositionSync
 from data.kline_cache import KlineCache
 from data.market_feed import MarketFeed, _parse_kline
 from data.database import Database
@@ -107,6 +108,19 @@ class Engine:
         )
 
         self._load_state()
+        symbols = [w["symbol"] for w in self.config.get("watchlist", [])]
+        if not self._current_position:
+            sync = PositionSync(self.client, self.executor, self.db, self.config)
+            self._current_position = await sync.sync(symbols)
+
+        active_symbols = {self._current_position["symbol"]} if self._current_position else set()
+        try:
+            cancelled = await self.executor.cleanup_orphaned_protective_orders(active_symbols)
+            if cancelled:
+                logger.warning(f"Cleaned orphaned protective orders: {cancelled}")
+        except Exception as e:
+            logger.warning(f"Cleanup orphaned protective orders failed: {e}")
+
         if self._current_position:
             self.oco.set_position(self._current_position)
             logger.info(f"Restored position: {self._current_position['symbol']}")

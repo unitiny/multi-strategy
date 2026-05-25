@@ -26,6 +26,16 @@ class OcoWatcher:
     def clear_position(self):
         self._position = None
 
+    def _order_ids(self, key: str) -> list:
+        if not self._position:
+            return []
+        list_key = key.replace("_order_id", "_order_ids")
+        values = self._position.get(list_key)
+        if values:
+            return list(values)
+        value = self._position.get(key)
+        return [value] if value else []
+
     async def start(self):
         self._running = True
         self._ws_task = asyncio.create_task(self._ws_loop())
@@ -90,10 +100,8 @@ class OcoWatcher:
         is_tp = order_type in ("TAKE_PROFIT_MARKET",)
 
         if is_sl or is_tp:
-            cancel_id = self._position.get(
-                "sl_order_id" if is_tp else "tp_order_id"
-            )
-            if cancel_id:
+            cancel_key = "sl_order_id" if is_tp else "tp_order_id"
+            for cancel_id in self._order_ids(cancel_key):
                 await self._cancel_order(symbol, cancel_id)
             await self.on_fill(
                 symbol=symbol,
@@ -120,26 +128,36 @@ class OcoWatcher:
         if not pos:
             return
         symbol = pos["symbol"]
-        sl_id = pos.get("sl_order_id")
-        tp_id = pos.get("tp_order_id")
+        sl_ids = self._order_ids("sl_order_id")
+        tp_ids = self._order_ids("tp_order_id")
 
-        sl_filled = await self._check_filled(symbol, sl_id)
-        tp_filled = await self._check_filled(symbol, tp_id)
+        sl_id = await self._first_filled(symbol, sl_ids)
+        tp_id = await self._first_filled(symbol, tp_ids)
+        sl_filled = sl_id is not None
+        tp_filled = tp_id is not None
 
         if sl_filled and not tp_filled:
             logger.info(f"OCO poll: SL filled, cancelling TP for {symbol}")
             exit_price = await self._get_fill_price(symbol, sl_id)
-            await self._cancel_order(symbol, tp_id)
+            for oid in tp_ids:
+                await self._cancel_order(symbol, oid)
             await self.on_fill(symbol=symbol, exit_price=exit_price,
                                is_sl=True, order_id=sl_id)
             self._position = None
         elif tp_filled and not sl_filled:
             logger.info(f"OCO poll: TP filled, cancelling SL for {symbol}")
             exit_price = await self._get_fill_price(symbol, tp_id)
-            await self._cancel_order(symbol, sl_id)
+            for oid in sl_ids:
+                await self._cancel_order(symbol, oid)
             await self.on_fill(symbol=symbol, exit_price=exit_price,
                                is_sl=False, order_id=tp_id)
             self._position = None
+
+    async def _first_filled(self, symbol: str, order_ids: list) -> Optional[int]:
+        for order_id in order_ids:
+            if await self._check_filled(symbol, order_id):
+                return order_id
+        return None
 
     async def _check_filled(self, symbol: str, order_id: int) -> bool:
         if not order_id:
