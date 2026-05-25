@@ -27,5 +27,9 @@ def test_deploy_workflow_pulls_prebuilt_sha_image():
     )
 
     assert "IMAGE_TAG=${{ github.sha }} docker compose pull" in workflow
-    assert "IMAGE_TAG=${{ github.sha }} docker compose up -d --remove-orphans" in workflow
+    assert "IMAGE_TAG=${{ github.sha }} docker compose run --rm --no-deps multi-strategy" in workflow
+    assert "test ! -e /app/data" in workflow
+    assert "IMAGE_TAG=${{ github.sha }} docker compose up -d --force-recreate --remove-orphans" in workflow
+    assert "--force-recreate" in workflow
+    assert "docker exec multi-strategy" in workflow
     assert "--build" not in workflow
