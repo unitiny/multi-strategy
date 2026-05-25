@@ -1,0 +1,12 @@
+__pycache__/
+**/__pycache__/
+*.pyc
+.env
+.git
+.gitignore
+*.db
+*.log
+state.json
+docs/
+README.md
+.claude/

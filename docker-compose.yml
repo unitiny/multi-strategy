@@ -1,0 +1,14 @@
+services:
+  multi-strategy:
+    build: .
+    container_name: multi-strategy
+    restart: always
+    network_mode: host
+    env_file:
+      - .env
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - app-data:/app/data
+
+volumes:
+  app-data:

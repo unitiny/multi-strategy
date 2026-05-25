@@ -1,0 +1,47 @@
+mode: watchlist  # watchlist | scan
+
+binance:
+  testnet: true  # true=模拟盘, false=实盘
+  proxy:
+    http: "http://127.0.0.1:7897"
+    https: "http://127.0.0.1:7897"
+
+strategy:
+  fixed_loss: 0.21          # USDT，单笔固定亏损
+  leverage: 3                # 固定杠杆倍数
+  kline_interval: "1h"       # K线周期
+  atr_period: 14             # ATR 计算周期
+  rsi_period: 14             # RSI 计算周期
+  ema_period: 5              # EMA 计算周期
+  volume_ma_period: 20       # 成交量均量周期
+  atr_pct_threshold: 0.5     # ATR% 最低阈值（%）
+  pullback_min_pct: 0.5      # 回调幅度下限（%）
+  pullback_max_pct: 2.0      # 回调幅度上限（%）
+  rsi_min: 30                # RSI 下限
+  rsi_max: 70                # RSI 上限
+  reward_risk: 3             # 默认盈亏比
+  limit_order_timeout_sec: 30 # 限价单超时转市价（秒）
+
+risk:
+  max_daily_stops: 2         # 每日最大连续止损次数
+  total_asset_target: 22.5   # USDT，总资产目标
+  rebalance_threshold_pct: 20 # 偏离阈值（%）
+
+watchlist:
+  - symbol: LINKUSDT
+  - symbol: SOLUSDT
+  - symbol: AVAXUSDT
+  - symbol: BTCUSDT
+  - symbol: ETHUSDT
+  - symbol: DOGEUSDT
+    reward_risk: 1.5         # 按标的覆盖示例
+
+schedule:
+  funding_report: "08:05"
+  heartbeat:
+    - "08:00"
+    - "12:00"
+    - "18:00"
+  vpn_check_interval_sec: 300
+
+log_level: INFO  # DEBUG | INFO | WARNING | ERROR
