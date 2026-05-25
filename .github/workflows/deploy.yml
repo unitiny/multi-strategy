@@ -3,7 +3,7 @@ name: Deploy to Server
 on:
   push:
     branches:
-      - main
+      - master
 
 jobs:
   deploy:
@@ -18,7 +18,7 @@ jobs:
           script: |
             cd /opt/multi-strategy
             git stash --include-untracked
-            git pull origin main
+            git pull origin master
             git stash drop 2>/dev/null || true
             docker compose up -d --build --remove-orphans
             docker image prune -f
