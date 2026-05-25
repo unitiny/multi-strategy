@@ -5,7 +5,10 @@ from datetime import datetime
 
 logger = logging.getLogger("multi_strategy")
 
-STATE_PATH = Path(__file__).resolve().parent.parent / "state.json"
+import os
+
+_PERSIST = Path(os.environ.get("PERSIST_DIR", Path(__file__).resolve().parent.parent))
+STATE_PATH = _PERSIST / "state.json"
 
 
 class DailyGuard:

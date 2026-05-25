@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -27,7 +28,7 @@ logger = logging.getLogger("multi_strategy")
 class Engine:
     def __init__(self, config: dict):
         self.config = config
-        self.state_path = Path(__file__).resolve().parent.parent / "state.json"
+        self.state_path = Path(os.environ.get("PERSIST_DIR", Path(__file__).resolve().parent.parent)) / "state.json"
         self.notifier: Optional[DingTalkNotifier] = None
         self.client: Optional[BinanceAsyncClient] = None
         self.cache = KlineCache()

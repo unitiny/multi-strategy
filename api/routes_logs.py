@@ -1,3 +1,4 @@
+import os
 import re
 from pathlib import Path
 from datetime import datetime
@@ -9,7 +10,8 @@ from api.auth import verify_api_key
 
 router = APIRouter(prefix="/logs", tags=["logs"], dependencies=[Depends(verify_api_key)])
 
-LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
+_PERSIST = Path(os.environ.get("PERSIST_DIR", Path(__file__).resolve().parent.parent))
+LOG_DIR = _PERSIST / "logs"
 LOG_PATTERN = re.compile(
     r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \| (\w+)\s*\| ([\w.]+) \| (.+)$"
 )

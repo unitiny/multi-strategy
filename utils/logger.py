@@ -1,4 +1,5 @@
 import logging
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -43,7 +44,7 @@ def setup_logger(level: str = "INFO") -> logging.Logger:
     sh.setFormatter(fmt)
     logger.addHandler(sh)
 
-    base_dir = __file__.rsplit("utils", 1)[0].rstrip("/\\")
+    base_dir = os.environ.get("PERSIST_DIR", __file__.rsplit("utils", 1)[0].rstrip("/\\"))
     fh = DailyFileHandler(f"{base_dir}/logs", encoding="utf-8")
     fh.setFormatter(fmt)
     logger.addHandler(fh)

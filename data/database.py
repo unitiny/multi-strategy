@@ -3,7 +3,10 @@ import json
 from pathlib import Path
 from datetime import datetime
 
-DB_PATH = Path(__file__).resolve().parent.parent / "trades.db"
+import os
+
+_PERSIST = Path(os.environ.get("PERSIST_DIR", Path(__file__).resolve().parent.parent))
+DB_PATH = _PERSIST / "trades.db"
 
 
 class Database:
