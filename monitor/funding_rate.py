@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 
 from binance.async_client import AsyncClient as BinanceAsyncClient
-from data.database import Database
+from market_data.database import Database
 
 logger = logging.getLogger("multi_strategy")
 

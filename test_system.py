@@ -37,7 +37,7 @@ async def test_config_loading():
 
 async def test_database():
     print("\n=== Test 2: SQLite Database ===")
-    from data.database import Database
+    from market_data.database import Database
     import tempfile
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
         db_path = f.name
@@ -62,7 +62,7 @@ async def test_database():
 
 async def test_kline_cache_and_indicators():
     print("\n=== Test 3: Kline Cache + Indicators ===")
-    from data.kline_cache import KlineCache
+    from market_data.kline_cache import KlineCache
     import numpy as np
     np.random.seed(42)
 
@@ -158,7 +158,7 @@ async def test_daily_guard():
 
 async def test_strategy_signal():
     print("\n=== Test 6: Strategy Signal Detection ===")
-    from data.kline_cache import KlineCache
+    from market_data.kline_cache import KlineCache
     from core.strategy import Strategy
     import numpy as np
     np.random.seed(100)
@@ -247,8 +247,8 @@ async def test_binance_connection():
 async def test_market_feed_warmup():
     print("\n=== Test 9: Market Feed Warmup ===")
     config = load_config()
-    from data.kline_cache import KlineCache
-    from data.market_feed import MarketFeed
+    from market_data.kline_cache import KlineCache
+    from market_data.market_feed import MarketFeed
 
     client = await _make_client(config)
     try:
@@ -281,8 +281,8 @@ async def test_market_feed_warmup():
 async def test_full_strategy_evaluation():
     print("\n=== Test 10: Full Strategy Evaluation on Real Data ===")
     config = load_config()
-    from data.kline_cache import KlineCache
-    from data.market_feed import MarketFeed
+    from market_data.kline_cache import KlineCache
+    from market_data.market_feed import MarketFeed
     from core.strategy import Strategy
 
     client = await _make_client(config)

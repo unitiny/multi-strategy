@@ -12,9 +12,9 @@ from core.strategy import Strategy
 from core.executor import Executor
 from core.oco_watcher import OcoWatcher
 from core.position_sync import PositionSync
-from data.kline_cache import KlineCache
-from data.market_feed import MarketFeed, _parse_kline
-from data.database import Database
+from market_data.kline_cache import KlineCache
+from market_data.market_feed import MarketFeed, _parse_kline
+from market_data.database import Database
 from risk.daily_guard import DailyGuard
 from risk.balance_monitor import BalanceMonitor
 from monitor.vpn_check import VpnCheck

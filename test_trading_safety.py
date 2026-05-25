@@ -6,7 +6,7 @@ import tempfile
 from core.executor import Executor
 from core.oco_watcher import OcoWatcher
 from core.position_sync import PositionSync
-from data.database import Database
+from market_data.database import Database
 
 
 class DummySignal:

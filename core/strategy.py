@@ -1,7 +1,7 @@
 import logging
 from typing import Optional
 
-from data.kline_cache import KlineCache
+from market_data.kline_cache import KlineCache
 from utils.config_loader import get_symbol_params
 
 logger = logging.getLogger("multi_strategy")
