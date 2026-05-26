@@ -56,7 +56,7 @@ jobs:
             git stash --include-untracked
             git pull origin master
             git stash drop 2>/dev/null || true
-            docker manifest inspect ghcr.io/unitiny/multi-strategy:${{ github.sha }} >/dev/null
+            docker logout ghcr.io 2>/dev/null || true
             IMAGE_TAG=${{ github.sha }} docker compose pull
             IMAGE_TAG=${{ github.sha }} docker compose run --rm --no-deps multi-strategy sh -lc 'echo "image sha=$APP_GIT_SHA"; test ! -e /app/data; grep -n "market_data" /app/core/engine.py; python -c "from core.engine import Engine; import dateparser; print(\"import check ok\")"'
             IMAGE_TAG=${{ github.sha }} docker compose up -d --force-recreate --remove-orphans
